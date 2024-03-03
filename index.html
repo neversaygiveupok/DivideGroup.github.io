@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>上传文件</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.8/xlsx.full.min.js"></script>
+
+ 
+  <style>
+    #container {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    #leftBox,
+    #middleBox,
+    #rightBox {
+      border: 1px solid #ccc;
+      padding: 10px;
+      width: 30%;
+      margin: 5px;
+      height: 200px;
+      overflow-y: auto;
+    }
+
+    #confirmButton {
+      margin-top: 10px;
+      padding: 5px 10px;
+      background-color: gray;
+      color: white;
+      cursor: not-allowed;
+    }
+
+    #confirmButton.active {
+      background-color: green;
+      cursor: pointer;
+    }
+
+    .removeButton,
+    .leaderButton {
+      background-color: green;
+      color: white;
+      cursor: pointer;
+      margin-right: 5px;
+      margin-top: 5px;
+      padding: 3px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .leaderButton[disabled] {
+      background-color: gray;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+
+<body>
+  文件：<br>
+  <input type="file" id="file"><br>
+  <div id="container">
+    <div id="leftBox"></div>
+    <div id="middleBox"></div>
+    <div id="rightBox"></div>
+  </div>
+  <button id="confirmButton" disabled>确定</button>
+  <button id="exportButton">导出为Excel</button>
+
+  <script>
+    var groupN=0;
+    var result = [];
+    document.querySelector("#file").addEventListener("change", function () {
+      var file = document.querySelector("#file").files[0];
+      var type = file.name.split('.');
+      if (type[type.length - 1] !== 'xlsx' && type[type.length - 1] !== 'xls') {
+        alert('只能选择excel文件导入');
+        return false;
+      }
+      const reader = new FileReader();
+      reader.readAsBinaryString(file);
+      reader.onload = (e) => {
+        const data = e.target.result;
+        const zzexcel = window.XLS.read(data, {
+          type: 'binary'
+        });
+        result = [];
+        for (let i = 0; i < zzexcel.SheetNames.length; i++) {
+          const newData = window.XLS.utils.sheet_to_json(zzexcel.Sheets[zzexcel.SheetNames[i]]);
+          result.push(...newData)
+        }
+
+        document.getElementById("leftBox").innerHTML = "";
+        document.getElementById("middleBox").innerHTML = "";
+        document.getElementById("rightBox").innerHTML = "";
+
+        result.forEach((item) => {
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.value = JSON.stringify(item);
+
+          const label = document.createElement("label");
+          label.appendChild(document.createTextNode(`${item.学号} - ${item.姓名}`));
+          label.appendChild(checkbox);
+
+          const listItem = document.createElement("div");
+          listItem.appendChild(label);
+
+          document.getElementById("leftBox").appendChild(listItem);
+
+          checkbox.addEventListener("change", function () {
+            checkboxAddListner(checkbox,listItem);
+          });
+        });
+ 
+        document.getElementById('exportButton').addEventListener('click', function() {
+    // 获取 rightBox 中的所有 div 元素
+    var divs = document.getElementById('rightBox').getElementsByTagName('div');
+
+    // 将每个 div 的 textContent 作为一个单独的行
+    var rows = Array.from(divs).map(div => [div.textContent]);
+
+    // 创建一个新的工作表（worksheet）
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // 创建一个新的工作簿（workbook）
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+
+    // 导出工作簿
+    var wbout = XLSX.write(wb, {bookType:'xlsx', type:'binary'});
+
+    // 将二进制字符串转换为 Blob 对象
+    var buf = new ArrayBuffer(wbout.length);
+    var view = new Uint8Array(buf);
+    for (var i=0; i<wbout.length; i++) view[i] = wbout.charCodeAt(i) & 0xFF;
+    var blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+
+    // 创建一个新的 URL 对象，指向 blob
+    var url = URL.createObjectURL(blob);
+
+    // 创建一个新的 a 元素
+    var a = document.createElement('a');
+
+    // 设置 a 元素的 href 属性为 blob 的 URL
+    a.href = url;
+
+    // 设置 a 元素的 download 属性为希望用户保存的文件名
+    a.download = 'export.xlsx';
+
+    // 触发 a 元素的 click 事件，开始下载
+    a.click();
+});
+
+
+
+// ...
+
+        
+      }
+    });
+    
+    function createRemoveButton(item) {
+      const removeButton = document.createElement("button");
+      removeButton.classList.add("removeButton");
+      removeButton.textContent = "移除";
+
+      removeButton.addEventListener("click", function () {
+        const index = result.findIndex(obj => JSON.stringify(obj) === item.querySelector("input").value);
+        result.splice(index, 1);
+       
+        const clonedItem = item.cloneNode(true);
+        clonedItem.removeChild(clonedItem.querySelector('.removeButton'));  // 移除removeButton
+        clonedItem.removeChild(clonedItem.querySelector('.leaderButton'));  // 移除removeButton
+         
+        const t = clonedItem.querySelector('label');
+        t.style.color = "black";
+        document.getElementById("leftBox").appendChild(clonedItem);
+        document.getElementById("middleBox").removeChild(item);
+
+        const checkbox = clonedItem.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+            checkbox.checked = false;  // 取消选中状态
+        checkbox.addEventListener("change", function () {
+           checkboxAddListner(checkbox,clonedItem);
+          
+           
+        });
+        
+        }
+      
+        updateConfirmButtonStatus();
+        
+      });
+
+      return removeButton;
+    }
+    //监听事件方法
+    function checkboxAddListner(checkbox,listItem){
+        if (checkbox.checked) {
+              const clonedItem = listItem.cloneNode(true);
+              const removeButton = createRemoveButton(clonedItem);
+              const leaderButton = createLeaderButton(clonedItem);
+
+              clonedItem.appendChild(removeButton);
+              clonedItem.appendChild(leaderButton);
+              
+              
+
+              document.getElementById("middleBox").appendChild(clonedItem);
+              document.getElementById("leftBox").removeChild(listItem);
+            }
+            updateConfirmButtonStatus();
+    }
+    function createLeaderButton(item) {
+      const leaderButton = document.createElement("button");
+      leaderButton.classList.add("leaderButton");
+      leaderButton.textContent = "组长";
+
+      leaderButton.addEventListener("click", function () {
+        item.style.color = "red";
+        Array.from(item.parentNode.children).forEach(sibling => {
+          if (sibling !== item) {
+            //sibling.querySelector(".leaderButton").disabled = true;
+            sibling.style.color = "black";
+          }
+        });
+      });
+
+      return leaderButton;
+    }
+
+    function updateConfirmButtonStatus() {
+      const middleBoxItems = document.querySelectorAll("#middleBox div");
+      const confirmButton = document.getElementById("confirmButton");
+
+      if (middleBoxItems.length >= 4 && middleBoxItems.length <= 6) {
+        confirmButton.classList.add("active");
+        confirmButton.disabled = false;
+      } else {
+        confirmButton.classList.remove("active");
+        confirmButton.disabled = true;
+      }
+
+      if (middleBoxItems.length > 6) {
+        alert("选择人数得保持在四到六人之间");
+        const lastItem = middleBoxItems[middleBoxItems.length - 1];
+         
+      }
+    }
+
+    document.getElementById("confirmButton").addEventListener("click", function () {
+      const middleBoxItems = document.querySelectorAll("#middleBox div");
+      const rightBox = document.getElementById("rightBox");
+
+      // 显示组号
+      groupN=groupN+1;
+      const groupNumber =groupN;
+      const groupLabel = document.createElement("div");
+      groupLabel.textContent = `第${groupNumber}组：`;
+      rightBox.appendChild(groupLabel);
+
+      middleBoxItems.forEach((item) => {
+        const itemClone = item.cloneNode(true);
+        itemClone.removeChild(itemClone.querySelector(".removeButton"));
+        itemClone.removeChild(itemClone.querySelector(".leaderButton"));
+        rightBox.appendChild(itemClone);
+      });
+
+      // 清空中间方框
+      document.getElementById("middleBox").innerHTML = "";
+
+      // 更新组数组
+      result.push(...Array.from(middleBoxItems).map(item => JSON.parse(item.querySelector("input").value)));
+    });
+  </script>
+</body>
+
+</html>
